@@ -100,7 +100,8 @@ class BitMapper(object):
     # create a WAH encoded string of the bitmaps
     # utilizing the given word size
     # incomplete so far 
-    def compress(self, bit_strings, word_size):
+    @staticmethod
+    def compress_columns(column_string, word_size):
         """
             bit_strings: A list of strings where each string is a character representation
                          of a byte value for a database tuple AKA a list of 8-bit bitmaps
@@ -109,7 +110,7 @@ class BitMapper(object):
         # create a singular string of all the bits
         # by column!
         # combine columns into their own strings, then combine into a single string
-        bit_string = ''.join([bit_strings[i][j] for j in range(len(bit_strings[0])) for i in range(len(bit_strings))])
+        #bit_string = ''.join([bit_strings[i][j] for j in range(len(bit_strings[0])) for i in range(len(bit_strings))])
        
         # now process the string of bits 
 
@@ -119,17 +120,17 @@ class BitMapper(object):
         run_count = 0       # how many runs so far?
 
         # to recognize what a run is
-        run_string_zero = "0" * word_size
-        run_string_one = "1" * word_size
+        run_string_zero = "0" * (word_size - 1)
+        run_string_one = "1" * (word_size - 1)
         
         compressed_string = '' # constructed piecemeal by the below logic
 
         # loop while there are enough bits remaining
         # to qualify as a run
-        while len(bit_string) >= word_size:
+        while len(column_string) >= word_size:
              
             # first check if there is a run
-            candidate_word = bit_string[:word_size]  
+            candidate_word = column_string[:word_size-1]  
             if candidate_word in (run_string_zero, run_string_one): 
 
                 # check if its a run already in progress or a new one                 
@@ -142,7 +143,7 @@ class BitMapper(object):
                     # so check if this is concluding a previous set of runs 
                     # and adjust compressed_string appropriately
                     if run_of is not None:
-                        compressed_string += self._runs(run_of, run_count, word_size)
+                        compressed_string += BitMapper._runs(run_of, run_count, word_size)
 
                     # then track new run
                     run_of = candidate_word[0]
@@ -150,13 +151,13 @@ class BitMapper(object):
 
                 # adjust the uncompressed string to reflect 
                 # what has just been processed
-                bit_string = bit_string[word_size-1:]  
+                column_string = column_string[word_size-1:]  
 
             # otherwise its a literal            
             else:
                 # check if its concluding a set of runs
                 if run_of is not None:
-                    compressed_string += self._runs(run_of, run_count, word_size)
+                    compressed_string += BitMapper._runs(run_of, run_count, word_size)
 
                 # then zero out the run trackers
                 run_of = None
@@ -164,12 +165,16 @@ class BitMapper(object):
                 # add the literal
                 compressed_string += "0" + candidate_word[:word_size-1] 
                 # and excise compressed bits from the bit string
-                bit_string = bit_string[word_size:]  # WAH literals hold word_size-1 bits
-                  
+                column_string = column_string[word_size-1:]  # WAH literals hold word_size-1 bits
+
+        # write any runs that were accumulating                   
+        if run_of is not None:
+            compressed_string += BitMapper._runs(run_of, run_count, word_size)
+
         # Now need the logic to append the final literal
         # and add any necessary padding
-        zero_pad = (word_size - 1) - len(bit_string)
-        last_string = bit_string + "0" * zero_pad
+        #zero_pad = (word_size - 1) - len(column_string)
+        last_string = "0" + column_string #+ "0" * zero_pad
         compressed_string += last_string
 
         return compressed_string
@@ -238,6 +243,23 @@ class BitMapper(object):
 
 me = BitMapper("animals_test.txt") 
 me.intake()
+
+
+# we want a single column
+#for i in range(len(me.sorted_bitmap)):
+bitmap = me.sorted_bitmap
+
+columns = []
+
+for i in range(len(bitmap[0])):
+    column = ''.join([bitmap[i]
+column = ''.join([bitmap[i][1:2] for i in range(len(bitmap))])
+#print(len(column))
+compressed_column = me.compress_columns(column, 32)
+print(compressed_column)
+
+
+
 #me.writeFile()
 
 #ret = me._runs("1", 15, 5)
@@ -248,7 +270,20 @@ me.intake()
 #bit_string = me.columns_to_row(me.sorted_bitmap)
 #print(bit_string)
 
+
+"""
+with open("animals_test_bitmap_sorted.txt", "r") as test_file:
+    lines = test_file.readlines()
+    line_tuples = []
+    for line in lines:
+        line_tuples.append(line.rstrip())
+        
+    print(BitMapper.columns_to_row(line_tuples))
+ """  
+
+
 # testing the compression algorithm now
+"""
 compressed = me.compress(me.sorted_bitmap, 32)
 i = 0
 for char in compressed:
@@ -257,3 +292,4 @@ for char in compressed:
     if i == 169:
         print()
         i = 0
+"""
