@@ -52,6 +52,7 @@ class BitMapper(object):
         self.sorted_bitmap = sorted_bitmap
     
     # currently this is just testing the intake method is working correctly
+    # i.e. sorted and unsorted bitmaps are good
     def writeFile(self):
         with open("RUSSIA_sorted.txt", "w+") as bitmap_file:
             for row in self.sorted_bitmap:
@@ -121,14 +122,14 @@ class BitMapper(object):
         run_string_zero = "0" * word_size
         run_string_one = "1" * word_size
         
-        compressed_string = None  # constructed piecemeal by the below logic
+        compressed_string = '' # constructed piecemeal by the below logic
 
         # loop while there are enough bits remaining
         # to qualify as a run
         while len(bit_string) >= word_size:
              
             # first check if there is a run
-            candidate_word = bit_string[:wordsize+1]  
+            candidate_word = bit_string[:word_size]  
             if candidate_word in (run_string_zero, run_string_one): 
 
                 # check if its a run already in progress or a new one                 
@@ -149,7 +150,7 @@ class BitMapper(object):
 
                 # adjust the uncompressed string to reflect 
                 # what has just been processed
-                bit_string = bit_string[word_size:]  
+                bit_string = bit_string[word_size-1:]  
 
             # otherwise its a literal            
             else:
@@ -161,9 +162,9 @@ class BitMapper(object):
                 run_of = None
                 run_count = 0
                 # add the literal
-                compressed_string += "0" + candidate_word[:word_size] 
+                compressed_string += "0" + candidate_word[:word_size-1] 
                 # and excise compressed bits from the bit string
-                bit_string = bit_string[word_size-1:]  # WAH literals hold word_size-1 bits
+                bit_string = bit_string[word_size:]  # WAH literals hold word_size-1 bits
                   
         # Now need the logic to append the final literal
         # and add any necessary padding
@@ -216,7 +217,12 @@ class BitMapper(object):
         # return a single string of the compressed data
         return ''.join(compressed_strings)
 
-  
+    @staticmethod
+    def columns_to_row(bit_strings):
+        bit_string = ''.join([bit_strings[i][j] for j in range(len(bit_strings[0])) for i in range(len(bit_strings))])
+        return bit_string
+        #print(bit_string)
+
     # creates a bitmap byte for a given row of file data
     def _bitString(self, col_dict):
         """
@@ -234,7 +240,20 @@ me = BitMapper("animals_test.txt")
 me.intake()
 #me.writeFile()
 
-ret = me._runs("1", 15, 5)
-print(ret)
-print(len(ret))
+#ret = me._runs("1", 15, 5)
+#print(ret)
+#print(len(ret.compress))
 
+# testing the columns to row technique  seems to check out
+#bit_string = me.columns_to_row(me.sorted_bitmap)
+#print(bit_string)
+
+# testing the compression algorithm now
+compressed = me.compress(me.sorted_bitmap, 32)
+i = 0
+for char in compressed:
+    print(char, end="")
+    i += 1
+    if i == 169:
+        print()
+        i = 0
