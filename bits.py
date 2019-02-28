@@ -172,7 +172,9 @@ class BitMapper(object):
         compressed_string += last_string
 
         return compressed_string
-
+    
+    # untested
+    @staticmethod
     def _runs(run_of, run_count, word_size):
 
         """
@@ -186,14 +188,14 @@ class BitMapper(object):
         while True:
             
             # check if run_count exceeds the capacity for a single byte to track it
-            if run_count > 2 ** (word_size - 2):
+            if run_count > (2 ** (word_size - 2)) - 1: 
 
                 # build max run word
-                temp_string = "1" + run_of + "1" * (word_size - 1)
+                temp_string = "1" + run_of + "1" * (word_size - 2)
                 compressed_strings.append(temp_string)
 
                 # and adjust run_count
-                run_count -= 2 ** (word_size - 2)
+                run_count -= (2 ** (word_size - 2)) - 1
             
             # run_count will fit in a single run word
             else:
@@ -206,7 +208,8 @@ class BitMapper(object):
 
                 # then build the string
                 temp_string = "1" + run_of + "0" * zero_pad + run_count_bits
-                
+                compressed_strings.append(temp_string)                
+
                 # and break because we all runs have been encoded
                 break
 
@@ -229,5 +232,9 @@ class BitMapper(object):
 
 me = BitMapper("animals_test.txt") 
 me.intake()
-me.writeFile()
+#me.writeFile()
+
+ret = me._runs("1", 15, 5)
+print(ret)
+print(len(ret))
 
