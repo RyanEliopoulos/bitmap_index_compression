@@ -9,11 +9,9 @@ def ageBucket(age):
             return i
         i += 1
 
-def bitString(col_dict):
-    
-    return ''.join(["1" if bucket in col_dict else "0" for bucket in buckets])
-        
 
+# provides majority of the logic for processing the given
+# files into the specified bitmaps
 class BitMapper(object):
     
     buckets = ["cat", "dog", "turtle", "bird"                     # Animal Types
@@ -27,7 +25,14 @@ class BitMapper(object):
         self.unsorted_bitmap = [] # This will be a list strings each representing 8 bits
 
     def intake(self):
-       
+        
+        """
+            This method reads each row from the filepath
+            given during object creation and stores the data
+            as a list of tuples, where each tuple is attribute
+            data, and creates sorted and unsorted bitmaps
+        """   
+
         # first turn each line into a 'tuple'
         # and create a list from the 'tuples'
         file_lines = [] 
@@ -58,10 +63,22 @@ class BitMapper(object):
                 bitmap_file.write(row)
                 bitmap_file.write("\n")
 
-    # creates a bitmap from a list of tuples
+    # creates a bitmap from a list of line tuples
     def createBitmap(self, lines):
-    
-        bit_string_list = []
+        """
+            lines: a list of lists. Each element is a list of strings
+                   where each string is an attribute value from the provided
+                   database file. 
+
+            A dictionary is populated with the strings acting as keys,
+            then the dictionary is queried with each attribute column
+            so and its presence of lack thereof informs the placement
+            of the 0s and 1s 
+        """    
+
+        bit_string_list = []  # holds a character representation of a byte
+        
+        # create a 'byte' for each tuple of attribute information
         for line in lines: 
             temp_dict = {}
 
@@ -78,8 +95,135 @@ class BitMapper(object):
 
         return bit_string_list
 
-    # creates a bitmap byte for a given row 
+
+    # create a WAH encoded string of the bitmaps
+    # utilizing the given word size
+    # incomplete so far 
+    def compress(self, bit_strings, word_size):
+        """
+            bit_strings: A list of strings where each string is a character representation
+                         of a byte value for a database tuple AKA a list of 8-bit bitmaps
+
+        """
+        # create a singular string of all the bits
+        # by column!
+        # combine columns into their own strings, then combine into a single string
+        bit_string = ''.join([bit_strings[i][j] for j in range(len(bit_strings[0])) for i in range(len(bit_strings))])
+       
+        # now process the string of bits 
+
+        # initialize loop variables
+        #run = False         # Currently tracking a chuck of runs?
+        run_of = None       # of 0's or 1's? Will be None if not currently counting runs
+        run_count = 0       # how many runs so far?
+
+        # to recognize what a run is
+        run_string_zero = "0" * word_size
+        run_string_one = "1" * word_size
+        
+        compressed_string = None  # constructed piecemeal by the below logic
+
+        # loop while there are enough bits remaining
+        # to qualify as a run
+        while len(bit_string) >= word_size:
+             
+            # first check if there is a run
+            candidate_word = bit_string[:wordsize+1]  
+            if candidate_word in (run_string_zero, run_string_one): 
+
+                # check if its a run already in progress or a new one                 
+                if candidate_word[0] == run_of:
+                    run_count += 1
+
+                # or if its a run that's just beginning
+                else:
+
+                    # so check if this is concluding a previous set of runs 
+                    # and adjust compressed_string appropriately
+                    if run_of is not None:
+                        compressed_string += self._runs(run_of, run_count, word_size)
+
+                    # then track new run
+                    run_of = candidate_word[0]
+                    run_count = 1
+
+                # adjust the uncompressed string to reflect 
+                # what has just been processed
+                bit_string = bit_string[word_size:]  
+
+            # otherwise its a literal            
+            else:
+                # check if its concluding a set of runs
+                if run_of is not None:
+                    compressed_string += self._runs(run_of, run_count, word_size)
+
+                # then zero out the run trackers
+                run_of = None
+                run_count = 0
+                # add the literal
+                compressed_string += "0" + candidate_word[:word_size] 
+                # and excise compressed bits from the bit string
+                bit_string = bit_string[word_size-1:]  # WAH literals hold word_size-1 bits
+                  
+        # Now need the logic to append the final literal
+        # and add any necessary padding
+        zero_pad = (word_size - 1) - len(bit_string)
+        last_string = bit_string + "0" * zero_pad
+        compressed_string += last_string
+
+        return compressed_string
+
+    def _runs(run_of, run_count, word_size):
+
+        """
+            calculates the proper string encoding for a WAH
+            compressed run with the given values
+        """
+        
+        # prepare in case run_count exceeds capacity of (word_size - 1) bits 
+        compressed_strings = []  
+
+        while True:
+            
+            # check if run_count exceeds the capacity for a single byte to track it
+            if run_count > 2 ** (word_size - 2):
+
+                # build max run word
+                temp_string = "1" + run_of + "1" * (word_size - 1)
+                compressed_strings.append(temp_string)
+
+                # and adjust run_count
+                run_count -= 2 ** (word_size - 2)
+            
+            # run_count will fit in a single run word
+            else:
+
+                # get bit representation of the number of runs
+                run_count_bits = format(run_count, "b")
+            
+                # figure out how many zeros need to preced those
+                zero_pad = (word_size - 2) - len(run_count_bits)
+
+                # then build the string
+                temp_string = "1" + run_of + "0" * zero_pad + run_count_bits
+                
+                # and break because we all runs have been encoded
+                break
+
+        # return a single string of the compressed data
+        return ''.join(compressed_strings)
+
+  
+    # creates a bitmap byte for a given row of file data
     def _bitString(self, col_dict):
+        """
+            col_dict: A dictionary whose keys reflect the values of the 
+                      three attribute columns in the file. 
+
+            Each column value is checked agains the dictionary, where
+            the column's presence results in a 1 bit and its absence a 0
+        """
+
         return ''.join(["1" if bucket in col_dict else "0" for bucket in BitMapper.buckets])
 
 
