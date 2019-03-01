@@ -1,3 +1,8 @@
+FILL = "fill"
+LIT = "literal"
+NSA_MODE = True
+
+
 # returns the appropriate age bucket
 # for a given age
 def ageBucket(age):
@@ -73,17 +78,21 @@ class BitMapper(object):
         # unsorted up first
         c32 = self.compress(self.unsorted_bitmap, 32)
         self.writeFile("animals_compressed_32.txt", c32)
+        self.writeMetadata("animals_compressed_32")
 
         # now sorted
         c32_sorted = self.compress(self.sorted_bitmap, 32)
         self.writeFile("animals_compressed_sorted_32.txt", c32_sorted)
+        self.writeMetadata("animals_compressed_sorted_32")
 
         ### Onto 64-bit words
         c64 = self.compress(self.unsorted_bitmap, 64)
         self.writeFile("animals_compressed_64.txt", c64)
+        self.writeMetadata("animals_compressed_64")
 
         c64_sorted = self.compress(self.sorted_bitmap, 64)
         self.writeFile("animals_compressed_sorted_64.txt", c64_sorted)
+        self.writeMetadata("animals_compressed_sorted_64")
             
 
     # creates and returns the compressed version of the given bitmap 
@@ -141,6 +150,24 @@ class BitMapper(object):
         return bit_string_list
 
 
+    # write the metadata to the designated file
+    # then reset the metadata variables
+    def writeMetadata(self, title):
+
+        # if metadata collection isn't turn off, turn back
+        if not NSA_MODE:
+            return
+
+        with open("meta_data.txt", "a+") as meta_file:
+            meta_file.write(title + "\n")
+            meta_file.write("\tfills:{}\n\t\tof 1:{}\n\t\tof 0:{}\n\tliterals:{}\n"
+                            .format(self.fills, self.fills_one, self.fills_zero, self.literals))
+        self.fills = 0
+        self.fills_one = 0
+        self.fills_zero = 0
+        self.literals = 0 
+
+
     # create a WAH encoded string of the given column
     def compress_column(self, column_string, word_size):
         """
@@ -161,7 +188,7 @@ class BitMapper(object):
         compressed_string = '' # constructed piecemeal by the below logic
 
         # loop while there are enough bits remaining
-        # to qualify as a run
+        # to require a full word encoding
         while len(column_string) >= word_size - 1: 
              
             # first check if there is a run
@@ -179,9 +206,8 @@ class BitMapper(object):
                     # and adjust compressed_string appropriately
                     if run_of is not None:
                         compressed_string += BitMapper._runs(run_of, run_count, word_size)
-                        
                         # adjust fill/literal tracking variables
-        
+                        self.updateMetadata(FILL, run_count, run_of)
 
                     # then track new run
                     run_of = candidate_word[0]
@@ -196,7 +222,8 @@ class BitMapper(object):
                 # check if its concluding a set of runs
                 if run_of is not None:
                     compressed_string += BitMapper._runs(run_of, run_count, word_size)
-
+                    self.updateMetadata(FILL, run_count, run_of)
+                
                 # then zero out the run trackers
                 run_of = None
                 run_count = 0
@@ -204,23 +231,38 @@ class BitMapper(object):
                 compressed_string += "0" + candidate_word[:word_size-1] 
                 # and excise compressed bits from the bit string
                 column_string = column_string[word_size-1:]  # WAH literals hold word_size-1 bits
+                self.updateMetadata(LIT, 1)
+
+        ### The column string is nearly or completely exhausted 
+        ### do some final housekeeping and return 
 
         # write any runs that were accumulating                   
         if run_of is not None:
             compressed_string += BitMapper._runs(run_of, run_count, word_size)
+            self.updateMetadata(FILL, run_count, run_of)
 
-        """ Need to check if there is anything left to make into a literal
-            so we aren't just throwing an extra zero in the case of there being nothing left 
-        """
-
-        # check for a literal that would need padding
+        # check for a final literal that would need padding
         if column_string:
             last_string = "0" + column_string 
             compressed_string += last_string
+            self.updateMetadata(LIT, 1)
 
         return compressed_string
    
- 
+    def updateMetadata(self, kind, count, run_of=None):
+        
+        # fill update logic
+        if kind == FILL:
+            assert(run_of is not None)
+            self.fills += count
+            if run_of == "1":
+                self.fills_one += count
+            elif run_of == "0":
+                self.fills_zero += count
+        # literal update
+        elif kind == LIT:
+            self.literals += count
+
     @staticmethod
     def _runs(run_of, run_count, word_size):
 
@@ -276,63 +318,8 @@ class BitMapper(object):
         return ''.join(["1" if bucket in col_dict else "0" for bucket in BitMapper.buckets])
 
 
-me = BitMapper("animals_test.txt") 
-me.go()
 
+if __name__ == "__main__":
+    me = BitMapper("animals_test.txt") 
+    me.go()
 
-
-"""
-# we want a single column
-#for i in range(len(me.sorted_bitmap)):
-bitmap = me.sorted_bitmap
-
-compressed_columns = []
-
-for i in range(len(bitmap[0])):
-    column = ''.join([bitmap[j][i] for j in range(len(bitmap))])
-    compressed_column = me.compress_column(column, 32)
-    compressed_columns.append(compressed_column)
-
-#print('\n'.join(compressed_columns))
-"""
-
-#column = ''.join([bitmap[i][1:2] for i in range(len(bitmap))])
-#print(len(column))
-#compressed_column = me.compress_columns(column, 32)
-#print(compressed_column)
-
-
-
-#me.writeFile()
-
-#ret = me._runs("1", 15, 5)
-#print(ret)
-#print(len(ret.compress))
-
-# testing the columns to row technique  seems to check out
-#bit_string = me.columns_to_row(me.sorted_bitmap)
-#print(bit_string)
-
-
-"""
-with open("animals_test_bitmap_sorted.txt", "r") as test_file:
-    lines = test_file.readlines()
-    line_tuples = []
-    for line in lines:
-        line_tuples.append(line.rstrip())
-        
-    print(BitMapper.columns_to_row(line_tuples))
- """  
-
-
-# testing the compression algorithm now
-"""
-compressed = me.compress(me.sorted_bitmap, 32)
-i = 0
-for char in compressed:
-    print(char, end="")
-    i += 1
-    if i == 169:
-        print()
-        i = 0
-"""
