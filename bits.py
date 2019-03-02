@@ -35,6 +35,11 @@ class BitMapper(object):
         self.fills = 0
         self.fills_one = 0
         self.fills_zero = 0
+        # for each word tracking some # of runs
+        # the # of words it compressed will be tracked
+        self.fills_one_vals = []
+        self.fills_zero_vals = []
+        
 
 
     def intake(self):
@@ -154,7 +159,7 @@ class BitMapper(object):
     # then reset the metadata variables
     def writeMetadata(self, title):
 
-        # if metadata collection isn't turn off, turn back
+        # if metadata collection is turned off, turn back
         if not NSA_MODE:
             return
 
@@ -162,10 +167,24 @@ class BitMapper(object):
             meta_file.write(title + "\n")
             meta_file.write("\tfills:{}\n\t\tof 1:{}\n\t\tof 0:{}\n\tliterals:{}\n"
                             .format(self.fills, self.fills_one, self.fills_zero, self.literals))
+
+            # calculate average # of words compressed into each run word
+            average_one = sum(self.fills_one_vals) // len(self.fills_one_vals) if self.fills_one_vals else 0
+            average_zero = sum(self.fills_zero_vals) // len(self.fills_zero_vals) if self.fills_zero_vals else 0
+
+            # now the median values
+            median_one = sorted(self.fills_one_vals)[len(self.fills_one_vals)//2]  if self.fills_one_vals else 0
+            median_zero = sorted(self.fills_zero_vals)[len(self.fills_zero_vals)//2] if self.fills_zero_vals else 0
+
+            meta_file.write("\n\tFill data:\n\t\tAverage, 1:{}\n\t\tMedian, 1:{}\n\t\t Average, 0:{}\n\t\tMedian, 0:{}\n\n\n"
+                            .format(average_one, median_one, average_zero, median_zero))
+
         self.fills = 0
         self.fills_one = 0
         self.fills_zero = 0
         self.literals = 0 
+        self.fills_one_vals = []
+        self.fills_zero_vals = []
 
 
     # create a WAH encoded string of the given column
@@ -205,7 +224,7 @@ class BitMapper(object):
                     # so check if this is concluding a previous set of runs 
                     # and adjust compressed_string appropriately
                     if run_of is not None:
-                        compressed_string += BitMapper._runs(run_of, run_count, word_size)
+                        compressed_string += self._runs(run_of, run_count, word_size)
                         # adjust fill/literal tracking variables
                         self.updateMetadata(FILL, run_count, run_of)
 
@@ -221,7 +240,7 @@ class BitMapper(object):
             else:
                 # check if its concluding a set of runs
                 if run_of is not None:
-                    compressed_string += BitMapper._runs(run_of, run_count, word_size)
+                    compressed_string += self._runs(run_of, run_count, word_size)
                     self.updateMetadata(FILL, run_count, run_of)
                 
                 # then zero out the run trackers
@@ -238,7 +257,7 @@ class BitMapper(object):
 
         # write any runs that were accumulating                   
         if run_of is not None:
-            compressed_string += BitMapper._runs(run_of, run_count, word_size)
+            compressed_string += self._runs(run_of, run_count, word_size)
             self.updateMetadata(FILL, run_count, run_of)
 
         # check for a final literal that would need padding
@@ -248,7 +267,11 @@ class BitMapper(object):
             self.updateMetadata(LIT, 1)
 
         return compressed_string
-   
+
+    # update the object's metadata variables
+    # meant to be called by compressColumn
+    # metadata variables should be reset after each call
+    # to compress   
     def updateMetadata(self, kind, count, run_of=None):
         
         # fill update logic
@@ -263,8 +286,7 @@ class BitMapper(object):
         elif kind == LIT:
             self.literals += count
 
-    @staticmethod
-    def _runs(run_of, run_count, word_size):
+    def _runs(self, run_of, run_count, word_size):
 
         """
             calculates the proper string encoding for a WAH
@@ -281,11 +303,11 @@ class BitMapper(object):
                 print("Got a run count that doesn't fit in a single word!")
                 # build max run word
                 temp_string = "1" + run_of + "1" * (word_size - 2)
+                assert(len(temp_string) == word_size)
                 compressed_strings.append(temp_string)
 
                 # and adjust run_count
                 run_count -= (2 ** (word_size - 2)) - 1
-            
             # run_count will fit in a single run word
             else:
 
@@ -297,10 +319,20 @@ class BitMapper(object):
 
                 # then build the string
                 temp_string = "1" + run_of + "0" * zero_pad + run_count_bits
+                assert(len(temp_string) == word_size)
                 compressed_strings.append(temp_string)                
 
                 # and break because we all runs have been encoded
                 break
+
+        ## Sanity check and update metadata
+        for run in compressed_strings: 
+            assert(run != "0" * word_size)
+
+            if run_of == "0":
+                self.fills_zero_vals.append(int(run[2:], base=2))  # ignore the header bits
+            elif run_of == "1":
+                self.fills_one_vals.append(int(run[2:], base=2))
 
         # return a single string of the compressed data
         return ''.join(compressed_strings)
@@ -320,6 +352,6 @@ class BitMapper(object):
 
 
 if __name__ == "__main__":
-    me = BitMapper("animals_test.txt") 
+    me = BitMapper("animals.txt") 
     me.go()
 
