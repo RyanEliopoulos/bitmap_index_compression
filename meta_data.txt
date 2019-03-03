@@ -1,0 +1,64 @@
+animals_compressed_32
+	fills:1260
+		of 1:0
+		of 0:1260
+	literals:50356
+
+	Fill data:
+		Average, 1:0
+		Median, 1:0
+		 Average, 0:1.0378912685337727
+		Median, 0:1
+
+		Max, 1: 0
+		Max, 0: 3
+
+
+animals_compressed_sorted_32
+	fills:49840
+		of 1:8795
+		of 0:41045
+	literals:1776
+
+	Fill data:
+		Average, 1:9.643640350877194
+		Median, 1:3
+		 Average, 0:44.517353579175705
+		Median, 0:3
+
+		Max, 1: 811
+		Max, 0: 2419
+
+
+animals_compressed_64
+	fills:18
+		of 1:0
+		of 0:18
+	literals:25390
+
+	Fill data:
+		Average, 1:0
+		Median, 1:0
+		 Average, 0:1.0
+		Median, 0:1
+
+		Max, 1: 0
+		Max, 0: 1
+
+
+animals_compressed_sorted_64
+	fills:23610
+		of 1:3870
+		of 0:19740
+	literals:1798
+
+	Fill data:
+		Average, 1:4.526315789473684
+		Median, 1:1
+		 Average, 0:22.820809248554912
+		Median, 0:1
+
+		Max, 1: 399
+		Max, 0: 1190
+
+
