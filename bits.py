@@ -16,7 +16,7 @@
 
 FILL = "fill"
 LIT = "literal"
-NSA_MODE = True
+NSA_MODE = False
 
 
 # returns the appropriate age bucket
@@ -316,8 +316,8 @@ class BitMapper(object):
     def _runs(self, run_of, run_count, word_size):
 
         """
-            calculates the proper string encoding for a WAH
-            compressed run with the given values
+            calculates the proper string encoding for  WAH
+            compressed runs with the given values
         """
         
         # prepare in case run_count exceeds capacity of (word_size - 1) bits 
@@ -327,7 +327,7 @@ class BitMapper(object):
             
             # check if run_count exceeds the capacity for a single byte to track it
             if run_count > (2 ** (word_size - 2)) - 1: 
-                print("Got a run count that doesn't fit in a single word!")
+                #print("Got a run count that doesn't fit in a single word!")
                 # build max run word
                 temp_string = "1" + run_of + "1" * (word_size - 2)
                 assert(len(temp_string) == word_size)
