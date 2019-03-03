@@ -1,3 +1,19 @@
+"""
+    Ryan Paulos 
+    CS 351, Sp 2019
+
+    Program expects the existences of animals.txt, a csv file from which data is read and transformed into 
+    bitmaps with varying compression levels (none, 32-bit WAH, 64-bit WAH) 
+
+    In the comments of the program a fill word is considered the compressed representation of X number of run bytes.
+    For example, the fill word 110011 would represent three bytes comprised entirely of ones (three runs of ones)
+
+    if NSA_MODE = True a file named meta_data.txt is created with compression information about each bitmap
+
+"""
+
+
+
 FILL = "fill"
 LIT = "literal"
 NSA_MODE = True
@@ -36,10 +52,13 @@ class BitMapper(object):
         self.fills_one = 0
         self.fills_zero = 0
         # for each word tracking some # of runs
-        # the # of words it compressed will be tracked
+        # the # of words it compressed is recorded for metadata analysis
         self.fills_one_vals = []
         self.fills_zero_vals = []
-        
+        # track the greatest number of runs 
+        # contained in a fill word
+        self.fills_one_max = 0
+        self.fills_zero_max = 0
 
 
     def intake(self):
@@ -169,15 +188,21 @@ class BitMapper(object):
                             .format(self.fills, self.fills_one, self.fills_zero, self.literals))
 
             # calculate average # of words compressed into each run word
-            average_one = sum(self.fills_one_vals) // len(self.fills_one_vals) if self.fills_one_vals else 0
-            average_zero = sum(self.fills_zero_vals) // len(self.fills_zero_vals) if self.fills_zero_vals else 0
+            average_one = sum(self.fills_one_vals) / len(self.fills_one_vals) if self.fills_one_vals else 0
+            average_zero = sum(self.fills_zero_vals) / len(self.fills_zero_vals) if self.fills_zero_vals else 0
 
             # now the median values
             median_one = sorted(self.fills_one_vals)[len(self.fills_one_vals)//2]  if self.fills_one_vals else 0
             median_zero = sorted(self.fills_zero_vals)[len(self.fills_zero_vals)//2] if self.fills_zero_vals else 0
 
-            meta_file.write("\n\tFill data:\n\t\tAverage, 1:{}\n\t\tMedian, 1:{}\n\t\t Average, 0:{}\n\t\tMedian, 0:{}\n\n\n"
+            meta_file.write("\n\tFill data:\n\t\tAverage, 1:{}\n\t\tMedian, 1:{}\n\t\t Average, 0:{}\n\t\tMedian, 0:{}\n"
                             .format(average_one, median_one, average_zero, median_zero))
+
+            # and the max values
+            max_one = max(self.fills_one_vals) if self.fills_one_vals else 0
+            max_zero = max(self.fills_zero_vals) if self.fills_zero_vals else 0
+
+            meta_file.write("\n\t\tMax, 1: {}\n\t\tMax, 0: {}\n\n\n".format(max_one, max_zero))
 
         self.fills = 0
         self.fills_one = 0
@@ -272,6 +297,8 @@ class BitMapper(object):
     # meant to be called by compressColumn
     # metadata variables should be reset after each call
     # to compress   
+    # NOTE: not all meta data variables are tracked here
+    # the _runs method is responsible for some as well
     def updateMetadata(self, kind, count, run_of=None):
         
         # fill update logic
@@ -330,9 +357,16 @@ class BitMapper(object):
             assert(run != "0" * word_size)
 
             if run_of == "0":
-                self.fills_zero_vals.append(int(run[2:], base=2))  # ignore the header bits
+                #self.fills_zero_vals.append(int(run[2:], base=2))  # ignore the header bits
+                self.fills_zero_vals.append(run_count)
+                if run_count > self.fills_zero_max:
+                    self.fills_zero_max = run_count
+
             elif run_of == "1":
-                self.fills_one_vals.append(int(run[2:], base=2))
+                #self.fills_one_vals.append(int(run[2:], base=2))
+                self.fills_one_vals.append(run_count)
+                if run_count > self.fills_one_max: 
+                    self.fills_one_max = run_count
 
         # return a single string of the compressed data
         return ''.join(compressed_strings)
