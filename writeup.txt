@@ -126,7 +126,8 @@ Uncompressed Bitmaps: The first two files to be created, animals_bitmap.txt and 
     storage for counting run words, but the most ever needed required 11 bits to store a mere 1,190 run words of zero.  That
     equals at least 51 bits for each fill word totally wasted.  
 
-    To conclude, 64-bit 
+    To conclude, sorting the underlying data beforehand will always improve performance, but deciding which word size is
+    best is not as obvious.
 
     
     
